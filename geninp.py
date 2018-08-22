@@ -26,6 +26,9 @@ class GenerateCPMDInput:
         self.cutoff = 0
         self.functional = ''
         self.psptype = ''
+        # implementing in a general way, though only D works now
+        self.isotope = False
+        self.isoidx = {}
         self.cnstr = {}
         self.restr = {}
         self.ncnstr = int(0)
@@ -222,6 +225,10 @@ class GenerateCPMDInput:
             self.functional = config['PSP']['FUNC']
             config.pop('PSP')
         # constraints and restraints
+        if 'ISOTOPE' in config:
+            self.isotope = True
+            self.isoidx = config['ISOTOPE']
+            config.pop('ISOTOPE')
         if 'CNSTR' in config:
             for key, value in config['CNSTR'].items():
                 if 'CONS' in key:
@@ -290,13 +297,16 @@ class GenerateCPMDInput:
         fac = 0.52917721092
         atomlabel = np.genfromtxt(fname[0], dtype="a2", skip_header=2)
         mol1 = [i[0].decode('ascii') for i in atomlabel]
+        if self.isotope:
+            for k, v in self.isoidx.items():
+                mol1[int(k)-1] = v
         atomtype = sorted(list(set(mol1)))
         indices = []
         length = []
         for i in atomtype:
-            temp = [j for j, x in enumerate(mol1) if x == i]
-            indices.append(temp)
-            length.append(len(temp))
+            tmp = [j for j, x in enumerate(mol1) if x == i]
+            indices.append(tmp)
+            length.append(len(tmp))
         atomtype = list(zip(atomtype, indices, length))
         mol = np.genfromtxt(fname[1], usecols=(1, 2, 3))
         natom = len(atomlabel)
@@ -325,11 +335,13 @@ class GenerateCPMDInput:
             xyz {np.array} -- geometry
         """
         # elements dictionary
-        # need add more elements
-        lmax = {"H": "S",
-                "C": "P",
-                "N": "P",
-                "O": "P"}
+        # guess only Deuterium will be used in the near future!
+        #      label type   amu   lmax
+        elem = {"H": ["H", 1.008, "S"],
+                "D": ["H", 2.014, "S"],
+                "C": ["C", 12.011, "P"],
+                "N": ["N", 14.007, "P"],
+                "O": ["O", 15.999, "P"]}
         out = open(self.inp, 'w')
         # &CPMD section
         print("&CPMD", file=out)
@@ -381,28 +393,35 @@ class GenerateCPMDInput:
               self.symm, self.solver, self.cellparmtype, self.cellparm,
               self.cutoff), file=out)
         # &ATOMS section
-        # FIXME: handle isotopes (URGENT)
+        # TODO: ability to handle other isotopes (not really necessary though)
+        mass = ''
         for i in range(len(atomtype)):
             label = atomtype[i][0]
-            pspfname = '*' + label + '_' + self.psptype + '_' + self.functional
-            print("{}\nLMAX={}\n{}".format(pspfname, lmax[label],
+            if self.isotope:
+                mass += '\n' + '    ' + str(elem[label][1]) 
+            pspfname = '*' + elem[label][0] + '_' + self.psptype + '_' + \
+                       self.functional
+            print("  {}\n  LMAX={}\n    {}".format(pspfname, elem[label][2],
                   atomtype[i][2]), file=out)
             for j in atomtype[i][1]:
                 print("    {0:11.6f}{1:11.6f}{2:11.6f}".format(xyz[j][0],
                       xyz[j][1], xyz[j][2]), file=out)
+        if self.isotope:
+            print("  ISOTOPES{}".format(mass), file=out)
         if self.ncnstr or self.nrestr:
-            print("CONSTRAINTS", file=out)
+            print("  CONSTRAINTS", file=out)
             if self.ncnstr:
-                print("  FIX STRUCTURE\n    {}".format(self.ncnstr), file=out)
+                print("    FIX STRUCTURE\n      {}".format(self.ncnstr),
+                      file=out)
                 for i in range(self.ncnstr):
-                    print("  {}".format(self.cnstr[i+1]), file=out)
+                    print("    {}".format(self.cnstr[i+1]), file=out)
             if self.nrestr:
-                print("  RESTRAINTS\n    {}".format(self.nrestr), file=out)
+                print("    RESTRAINTS\n      {}".format(self.nrestr), file=out)
                 for i in range(self.nrestr):
-                    print("  {}".format(self.restr[i+1]), file=out)
-            print("END CONSTRAINTS", file=out)
+                    print("    {}".format(self.restr[i+1]), file=out)
+            print("  END CONSTRAINTS", file=out)
         # &DFT section, pretty much hardcoded
-        print("&END\n\n\n&DFT\n  FUNCTIONAL {}\n  GC-CUTOFF\n    1D-8\n&END".
+        print("&END\n\n\n&DFT\n  FUNCTIONAL {}\n  GC-CUTOFF\n    1d-8\n&END".
              format(self.functional), file=out)
         if self.pimd:
             print("\n\n&PIMD\n  TROTTER DIMENSION\n    {}".format(self.nb),
@@ -419,7 +438,7 @@ class GenerateCPMDInput:
             print("  PRINT LEVEL\n    {}\n  PROCESSOR GROUPS\n    {}\n&END".
                   format(self.prtlvl, self.procgrp), file=out)
         out.close()
-        print("Successfully Created CPMD Input File {}.\n Please check the "
+        print("Successfully Created CPMD Input File {}.\nPlease check the "
               "resulting file carefully before running MD".format(self.inp))
 
 
