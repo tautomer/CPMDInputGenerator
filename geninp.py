@@ -255,6 +255,8 @@ class GenerateCPMDInput:
         if self.symm < 0:
             self.symm = 0
             raise Warning('Symmetry not specified. Reset to isolated box.')
+        if not self.cellparm:
+            raise ValueError('Cell parameters must be specified.')
         if not self.solver:
             self.solver = 'TUCKERMAN'
             raise Warning('Poisson solver not specified, use Tuckerman')
@@ -296,6 +298,10 @@ class GenerateCPMDInput:
         """
         fac = 0.52917721092
         atomlabel = np.genfromtxt(fname[0], dtype="a2", skip_header=2)
+        if len(fname) == 2:
+            mol = np.genfromtxt(fname[1], usecols=(1, 2, 3))
+        else:
+            mol = np.genfromtxt(fname[0], usecols=(1, 2, 3))
         mol1 = [i[0].decode('ascii') for i in atomlabel]
         if self.isotope:
             for k, v in self.isoidx.items():
@@ -308,7 +314,6 @@ class GenerateCPMDInput:
             indices.append(tmp)
             length.append(len(tmp))
         atomtype = list(zip(atomtype, indices, length))
-        mol = np.genfromtxt(fname[1], usecols=(1, 2, 3))
         natom = len(atomlabel)
         if self.nb > 1:
             mol2 = np.zeros((natom, 3))
