@@ -394,7 +394,7 @@ class GenerateCPMDInput:
         print("&END\n\n", file=out)
         # &SYSTEM section
         print("&SYSTEM\n  SYMMETRY\n    {}\n  POISSON SOLVER {}\n   ANGSTROM"
-              "\n  CELL {}\n    {}\n  CUTOFF\n    {}\n&END\n\n&ATOMS".format(
+              "\n  CELL {}\n    {}\n  CUTOFF\n    {}\n&END\n\n\n&ATOMS".format(
               self.symm, self.solver, self.cellparmtype, self.cellparm,
               self.cutoff), file=out)
         # &ATOMS section
@@ -406,7 +406,7 @@ class GenerateCPMDInput:
                 mass += '\n' + '    ' + str(elem[label][1]) 
             pspfname = '*' + elem[label][0] + '_' + self.psptype + '_' + \
                        self.functional
-            print("  {}\n  LMAX={}\n    {}".format(pspfname, elem[label][2],
+            print("{}\nLMAX={}\n{}".format(pspfname, elem[label][2],
                   atomtype[i][2]), file=out)
             for j in atomtype[i][1]:
                 print("    {0:11.6f}{1:11.6f}{2:11.6f}".format(xyz[j][0],
