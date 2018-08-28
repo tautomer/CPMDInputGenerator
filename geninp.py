@@ -318,7 +318,7 @@ class GenerateCPMDInput:
         if self.nb > 1:
             mol2 = np.zeros((natom, 3))
             if self.init:
-                crd = open('RepCrd', 'w')
+                crd = open(self.repfname, 'w')
             for i in range(self.nb):
                 ind = natom * i
                 mol2 += mol[ind:ind+natom]
