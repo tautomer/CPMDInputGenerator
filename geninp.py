@@ -169,7 +169,7 @@ class GenerateCPMDInput:
                     self.step = config['TRAJ']['SAMPLE']
                 config.pop('TRAJ')
             if 'TEMP' in config:
-                self.temp = 300
+                self.temp = config['TEMP']
                 config.pop('TEMP')
             if 'STEP' in config:
                 self.maxstep = config['STEP']
