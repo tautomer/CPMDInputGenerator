@@ -57,6 +57,7 @@ class GenerateCPMDInput:
         self.ion = {}
         self.elec = {}
         self.center = False
+        self.quench = False
         # flux side
         self.fs = False
         self.fsidx = ''
@@ -162,6 +163,9 @@ class GenerateCPMDInput:
             if 'KEEPWFN' in config:
                 self.keepwfn = True
                 config.pop('KEEPWFN')
+            if 'QUENCH' in config:
+                self.quench = True
+                config.pop('QUENCH')
             if 'TRAJ' in config:
                 self.traj = True
                 if 'SAMPLE' in config['TRAJ']:
@@ -277,6 +281,14 @@ class GenerateCPMDInput:
         # bomd and nose
             if self.bo and self.elec:
                 raise Warning('Running BOMD, electron thermostat ignored.')
+            if self.quench:
+                if self.sample and self.step != 0:
+                    self.step = 0
+                    raise Warning('No tracjectory saved with quench enabled.')
+                else:
+                    self.traj = True
+                    self.sample = True
+                    self.step = 0
         # pimd
         if self.pimd:
             if self.nb == 0:
@@ -368,6 +380,8 @@ class GenerateCPMDInput:
             # TODO: f.write may work better in this case
             if self.keepwfn:
                 print("  REAL SPACE WFN KEEP", file=out)
+            if self.quench:
+                print("  QUENCH IONS ELECTRONS", file=out)
             if self.traj:
                 if self.sample:
                     print("  TRAJECTORY SAMPLE\n    {}".format(self.step),
