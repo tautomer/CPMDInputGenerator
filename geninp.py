@@ -1,3 +1,4 @@
+# TODO: the script itself should be able to generate a list of inputs
 """Generate CPMD input files."""
 import sys
 import json
@@ -20,6 +21,8 @@ class GenerateCPMDInput:
         self.rst = False
         self.rstopt = ''
         self.symm = int(-1)
+        self.charge = 0
+        self.multi = 1
         self.solver = ''
         self.cellparmtype = ''
         self.cellparm = ''
@@ -65,14 +68,14 @@ class GenerateCPMDInput:
 
 
     def ReadConfig(self, conf):
-        """read 
-        
+        """read
+
         Arguments:
             conf {str} -- configuration json
         """
         print("This script is not able to handle typos, etc.\nDouble-check you"
               "r json file and resulting input file.")
-        with open(conf) as conf_file:    
+        with open(conf) as conf_file:
             confdata = json.load(conf_file)
         config = {}
         # convert all strings to caps, since CPMD input file only takes caps
@@ -103,10 +106,10 @@ class GenerateCPMDInput:
 
     def ParseConfig(self, config):
         """parse json file
-        
+
         Arguments:
             config {dictionary} -- loaded from json
-        
+
         Returns:
             dictionary -- reduced config for future uses
         """
@@ -210,6 +213,14 @@ class GenerateCPMDInput:
         if 'SYMM' in config:
             self.symm = config['SYMM']
             config.pop('SYMM')
+        # number of charge
+        if 'CHARGE' in config:
+            self.charge = config['CHARGE']
+            config.pop('CHARGE')
+        # number of multiplicity
+        if 'MULTI' in config:
+            self.charge = config['MULTI']
+            config.pop('MULTI')
         # poisson solver
         if 'SOLVER' in config:
             self.solver = config['SOLVER']
@@ -249,7 +260,7 @@ class GenerateCPMDInput:
 
     def CheckParm(self):
         """check conflicts in the configurations
-        
+
         """
         # TODO: a better way to handle errors and warnings.
         # job type
@@ -301,10 +312,10 @@ class GenerateCPMDInput:
 
     def ReadInput(self, fname):
         """read input file and sort atom types and indices
-        
+
         Arguments:
             fname {list} -- geo and traj files
-        
+
         Returns:
             [list, np.array] -- atomic labels and coordinates
         """
@@ -313,7 +324,7 @@ class GenerateCPMDInput:
         if len(fname) == 2:
             mol = np.genfromtxt(fname[1], usecols=(1, 2, 3))
         else:
-            mol = np.genfromtxt(fname[0], usecols=(1, 2, 3))
+            mol = np.genfromtxt(fname[0], usecols=(1, 2, 3), skip_header=2)
         mol1 = [i[0].decode('ascii') for i in atomlabel]
         if self.isotope:
             for k, v in self.isoidx.items():
@@ -340,13 +351,14 @@ class GenerateCPMDInput:
             mol2 /= self.nb
         else:
             mol2 = mol
-        mol2 *= fac
+        if len(fname) == 2:
+            mol2 *= fac
         return atomtype, mol2
 
 
     def WriteInput(self, atomtype, xyz):
         """write CPMD input file
-        
+
         Arguments:
             atomtype {list} -- labels
             xyz {np.array} -- geometry
@@ -364,6 +376,8 @@ class GenerateCPMDInput:
         print("&CPMD", file=out)
         if self.pimd:
             print("  PATH INTEGRAL", file=out)
+        if self.charge != 0 or self.multi != 1:
+            print("  LSD", file=out)
         if self.opt:
             if self.rst:
                 print("  RESTART {}".format(self.rstopt), file=out)
@@ -392,6 +406,8 @@ class GenerateCPMDInput:
                   self.maxstep), file=out)
             if self.dt != 0:
                 print("  TIMESTEP\n    {}".format(self.dt), file=out)
+            if self.charge != 0 or self.multi != 1:
+                print("  LSD", file=out)
             if self.nose:
                 if self.ion:
                     print("  NOSE IONS MASSIVE\n    {}".format(self.ion),
@@ -405,9 +421,12 @@ class GenerateCPMDInput:
                 print("  FLUX SIDE\n    {}".format(self.fsidx), file=out)
             if self.ranvel:
                 print("  RAN INIT VEL", file=out)
-        print("&END\n\n", file=out)
+        print("&END\n\n\n&SYSTEM", file=out)
         # &SYSTEM section
-        print("&SYSTEM\n  SYMMETRY\n    {}\n  POISSON SOLVER {}\n   ANGSTROM"
+        if self.charge != 0:
+            print("  CHARGE\n    {}".format(self.charge), file=out)
+            print("  MULTIPLICITY\n    {}".format(self.multi), file=out)
+        print("  SYMMETRY\n    {}\n  POISSON SOLVER {}\n  ANGSTROM"
               "\n  CELL {}\n    {}\n  CUTOFF\n    {}\n&END\n\n\n&ATOMS".format(
               self.symm, self.solver, self.cellparmtype, self.cellparm,
               self.cutoff), file=out)
@@ -417,10 +436,10 @@ class GenerateCPMDInput:
         for i in range(len(atomtype)):
             label = atomtype[i][0]
             if self.isotope:
-                mass += '\n' + '    ' + str(elem[label][1]) 
+                mass += '\n' + '    ' + str(elem[label][1])
             pspfname = '*' + elem[label][0] + '_' + self.psptype + '_' + \
                        self.functional
-            print("{}\nLMAX={}\n{}".format(pspfname, elem[label][2],
+            print("{}\n  LMAX={}\n  {}".format(pspfname, elem[label][2],
                   atomtype[i][2]), file=out)
             for j in atomtype[i][1]:
                 print("    {0:11.6f}{1:11.6f}{2:11.6f}".format(xyz[j][0],
@@ -445,7 +464,7 @@ class GenerateCPMDInput:
         if self.pimd:
             print("\n\n&PIMD\n  TROTTER DIMENSION\n    {}".format(self.nb),
                   file=out)
-            if self.nm: 
+            if self.nm:
                 print("  NORMAL MODES\n    {}".format(self.wmass), file=out)
             print("  FACMASS\n    {}".format(self.facmass), file=out)
             if self.debrogile:
