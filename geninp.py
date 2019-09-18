@@ -376,7 +376,7 @@ class GenerateCPMDInput:
         print("&CPMD", file=out)
         if self.pimd:
             print("  PATH INTEGRAL", file=out)
-        if self.charge != 0 or self.multi != 1:
+        if self.multi != 1:
             print("  LSD", file=out)
         if self.opt:
             if self.rst:
@@ -406,8 +406,6 @@ class GenerateCPMDInput:
                   self.maxstep), file=out)
             if self.dt != 0:
                 print("  TIMESTEP\n    {}".format(self.dt), file=out)
-            if self.charge != 0 or self.multi != 1:
-                print("  LSD", file=out)
             if self.nose:
                 if self.ion:
                     print("  NOSE IONS MASSIVE\n    {}".format(self.ion),
@@ -425,6 +423,7 @@ class GenerateCPMDInput:
         # &SYSTEM section
         if self.charge != 0:
             print("  CHARGE\n    {}".format(self.charge), file=out)
+        if self.multi != 1:
             print("  MULTIPLICITY\n    {}".format(self.multi), file=out)
         print("  SYMMETRY\n    {}\n  POISSON SOLVER {}\n  ANGSTROM"
               "\n  CELL {}\n    {}\n  CUTOFF\n    {}\n&END\n\n\n&ATOMS".format(
